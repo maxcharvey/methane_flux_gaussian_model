@@ -1,2 +1,2 @@
-# methane_flux
+# Methane flux
 QCES methane flux project
