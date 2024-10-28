@@ -1,0 +1,15 @@
+name: gaussian_mixing
+dependencies:
+  - python
+  - cartopy
+  - geopy
+  - numpy
+  - scipy
+  - ipython
+  - jupyter
+  - cmcrameri
+  - scikit-image
+  - matplotlib
+  - pyproj
+  - windrose
+  - pandas
