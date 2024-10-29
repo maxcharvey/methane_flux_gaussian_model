@@ -7,10 +7,10 @@ dependencies:
   - scipy
   - ipython
   - jupyter
-  - cmcrameri
+  #- cmcrameri
   - scikit-image
   - matplotlib
   - pyproj
-  - windrose
+  #- windrose
   - pandas
   - ipympl
