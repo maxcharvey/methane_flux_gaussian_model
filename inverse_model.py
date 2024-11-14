@@ -4,6 +4,7 @@ import flux_maps as maps
 import flux_model as model
 import pandas as pd
 from scipy.special import erf
+import openpyxl
 
 # Load the dataset
 file_path = 'data/msr_ch4_met_hrly_310524_270924.csv'
@@ -74,8 +75,8 @@ def find_basis_vectors(row):
     
     return x_hat, y_hat
 
-data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
 
+data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
 
 
 # Introduce the fixed lat-lon coords for the points of interest
@@ -95,8 +96,8 @@ def find_relative_distance(row):
     y_rel_dist = np.dot(y_dist, y_unit) + np.dot(x_dist, y_unit)
     return abs(x_rel_dist), y_rel_dist
 
-data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
 
+data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
 
 # Define some parameters that we need for the function below 
 z=10
@@ -106,55 +107,99 @@ ls=500
 
 def inverse_conc_line(row):
 
-    A = row['A']
-    B = row['B']
-    C = row['C']
-    D = row['D']
-    x = row['x_rel_dist']
-    y = row['y_rel_dist']
-    methane = row['ch4_ppm']
-    u = row['ws']
+    if row['x_rel_dist'] <= 100:
+        return np.nan  # or return None
 
-    # Calculating sigma_z
-    sigma_z = A * (x*0.001) ** B
+    else: 
+        A = row['A']
+        B = row['B']
+        C = row['C']
+        D = row['D']
+        x = row['x_rel_dist']
+        y = row['y_rel_dist']
+        methane = row['ch4_ppm']
+        u = row['ws']
 
-    # Angle term required
-    angle_deg = C - D *np.log(x/1000)
-    angle_rad = np.radians(angle_deg)
+        # Calculating sigma_z
+        sigma_z = A * (x*0.001) ** B
 
-    # Calculate the tangent term 
-    tan_term = np.tan(angle_rad)
+        # Angle term required
+        angle_deg = C - D *np.log(x/1000)
+        angle_rad = np.radians(angle_deg)
 
-    # Constants
-    constant = 465.11628
+        # Calculate the tangent term 
+        tan_term = np.tan(angle_rad)
 
-    # Calculate sigma_y
-    sigma_y = constant * x * 0.001 * tan_term 
+        # Constants
+        constant = 465.11628
 
-    # Denominator from the plume equation 
-    denominator = 2 * np.sqrt(2 * np.pi) * u * A * (x/1000)**B
-    denominator = np.maximum(denominator, 1e-10)
+        # Calculate sigma_y
+        sigma_y = constant * x * 0.001 * tan_term 
 
-    # Exponential terms:
-    exp1 = np.exp(-((z - h) ** 2) / (2 * sigma_z ** 2))
-    exp2 = np.exp(-((z + h) ** 2) / (2 * sigma_z ** 2))
+        # Denominator from the plume equation 
+        denominator = 2 * np.sqrt(2 * np.pi) * u * A * (x/1000)**B
 
-    # Error functions:  
-    sqrt_2 = np.sqrt(2)
-    y1 = (y + ls / 2) / (sqrt_2 * sigma_y)
-    y2 = (y - ls / 2) / (sqrt_2 * sigma_y)
+        # Exponential terms:
+        exp1 = np.exp(-((z - h) ** 2) / (2 * sigma_z ** 2))
+        exp2 = np.exp(-((z + h) ** 2) / (2 * sigma_z ** 2))
 
-    # Error function differences:
-    erf_diff = erf(y1) - erf(y2)
-    erf_diff = np.maximum(erf_diff, 1e-10)
+        # Error functions:  
+        sqrt_2 = np.sqrt(2)
+        y1 = (y + ls / 2) / (sqrt_2 * sigma_y)
+        y2 = (y - ls / 2) / (sqrt_2 * sigma_y)
 
-    # Calculating the flux q
-    q = methane * denominator / ((exp1 + exp2) * erf_diff)
+        # Error function differences:
+        erf_diff = erf(y1) - erf(y2)
+        erf_diff = np.maximum(erf_diff, 1e-0)
 
-    return q
+        # Calculating the flux q
+        q = methane * denominator / ((exp1 + exp2) * erf_diff)
+
+        return q
 
 data['q'] = data.apply(inverse_conc_line, axis=1)
+window=50
+data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 
-fig, ax1 = plt.subplots(figsize=(12,8))
-ax1.plot(data['date'], data['q'])
-plt.show()
+
+def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
+    rolling_avg = y.ewm(span=window, adjust=False).mean()
+    ax.plot(x, y, label=label, color=color, alpha=0.5)
+    ax.plot(x, rolling_avg, label=f'{label} (Smoothed Avg)', color='black', linestyle='--')
+    ax.set_xlabel('Date')
+    ax.set_ylabel(ylabel)
+    ax.legend()
+
+
+def plot_combined_time_series(data, window=12):
+    fig, axes = plt.subplots(6, 1, figsize=(12, 9), sharex=True)
+
+    # Plot Temperature
+    plot_time_series_subplot(axes[0], data['date'], data['temp'], 'Temperature (°C)', 'Temperature (°C)', 'tab:red', window)
+
+    # Plot Methane Concentration
+    plot_time_series_subplot(axes[1], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
+
+    # Plot Relative Humidity
+    plot_time_series_subplot(axes[2], data['date'], data['rh'], 'Relative Humidity (%)', 'Relative Humidity', 'tab:blue', window)
+
+    # Plot Wind Speed
+    plot_time_series_subplot(axes[3], data['date'], data['ws'], 'Wind Speed (units)', 'Wind Speed', 'tab:purple', window)
+
+    # Plot Stability Class
+    stability_class_numeric = data['stability_class'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5})
+    plot_time_series_subplot(axes[4], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
+    
+    # Plot calculated methane flux from inverse model
+    plot_time_series_subplot(axes[5], data['date'], data['q'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
+     
+    plt.tight_layout()
+    plt.show()
+
+plot_combined_time_series(data)
+
+
+# Wanting to view some of the data points in excel for ease 
+#output_file = '/Users/maxharvey/Documents/methane_flux_data.xlsx'
+#data.to_excel(output_file, index=False)  # index=False prevents saving the DataFrame index as a separate column
+
