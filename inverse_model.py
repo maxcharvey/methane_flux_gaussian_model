@@ -107,7 +107,7 @@ ls=500
 
 def inverse_conc_line(row):
 
-    if row['x_rel_dist'] <= 100:
+    if row['x_rel_dist'] <= 0:
         return np.nan  # or return None
 
     else: 
@@ -158,7 +158,7 @@ def inverse_conc_line(row):
         return q
 
 data['q'] = data.apply(inverse_conc_line, axis=1)
-window=50
+window=12
 data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 
 
@@ -191,7 +191,7 @@ def plot_combined_time_series(data, window=12):
     plot_time_series_subplot(axes[4], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
     
     # Plot calculated methane flux from inverse model
-    plot_time_series_subplot(axes[5], data['date'], data['q'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
+    plot_time_series_subplot(axes[5], data['date'], data['q'], 'Source flux', 'Source flux', 'tab:cyan', window)
      
     plt.tight_layout()
     plt.show()
@@ -199,7 +199,41 @@ def plot_combined_time_series(data, window=12):
 plot_combined_time_series(data)
 
 
-# Wanting to view some of the data points in excel for ease 
-#output_file = '/Users/maxharvey/Documents/methane_flux_data.xlsx'
-#data.to_excel(output_file, index=False)  # index=False prevents saving the DataFrame index as a separate column
 
+# I want to look at the correlation between some of the variables. 
+# rolling_avg = y.ewm(span=window, adjust=False).mean() 
+
+# The correlation between the conc at source and the conc at the measurement point
+
+corr_s_m = (data['ch4_ppb'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
+corr_t_m = (data['temp'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
+
+
+fig, ax1 = plt.subplots(figsize=(12, 6))
+
+# Plot Methane Concentration on the primary y-axis
+ax1.plot(data['date'], data['ch4_ppb'].ewm(span=window, adjust=False).mean(), label='Methane Concentration', color='tab:green')
+ax1.set_ylabel('Methane Concentration (ppb)', color='tab:green')
+ax1.tick_params(axis='y', labelcolor='tab:green')
+
+# Create a secondary y-axis for Temperature
+ax2 = ax1.twinx()
+ax2.plot(data['date'], data['temp'].ewm(span=window, adjust=False).mean(), label='Temperature', color='tab:red')
+ax2.set_ylabel('Temperature (°C)', color='tab:red')
+ax2.tick_params(axis='y', labelcolor='tab:red')
+
+# Set common x-axis label
+ax1.set_xlabel('Date')
+
+# Add a legend
+fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.9))
+
+# Set title
+plt.title('Methane Concentration and Temperature Over Time')
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+print(corr_s_m)
+print(corr_t_m)
