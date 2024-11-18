@@ -68,12 +68,12 @@ def find_basis_vectors(row):
     wind_direction = np.deg2rad(row['wd'])  # Convert degrees to radians
     
     # Define x_hat as the unit vector in the wind direction
-    x_hat = np.asarray([np.cos(wind_direction), np.sin(wind_direction)])
+    x_hat = np.asarray([-np.sin(wind_direction), -np.cos(wind_direction)])
     
     # Define y_hat as the unit vector perpendicular to x_hat (90 degrees rotated)
-    y_hat = np.asarray([-np.sin(wind_direction), np.cos(wind_direction)])
+    y_hat = np.asarray([np.cos(wind_direction), -np.sin(wind_direction)])
     
-    return -x_hat, y_hat
+    return x_hat, y_hat
 
 
 data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
@@ -86,6 +86,10 @@ sampler = np.asarray([0.144343, 52.237111])
 
 x_dist = np.asarray([(sampler[0]-landfill[0])*110000*np.cos(sampler[1]), 0])
 y_dist = np.asarray([0, (sampler[1]-landfill[1])*110000])
+
+#x_dist = np.asarray([(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
+#y_dist = np.asarray([(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
+
 
 
 # Now need to turn these into distance for each timestep based upon dot produt with wind vector 
@@ -107,7 +111,7 @@ ls=500
 
 def inverse_conc_line(row):
 
-    if row['x_rel_dist'] <= -200:
+    if row['x_rel_dist'] <= 100:
         return np.nan  # or return None
 
     else: 
@@ -159,7 +163,16 @@ def inverse_conc_line(row):
 
 data['q'] = data.apply(inverse_conc_line, axis=1)
 window=12
-data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
+
+data['q_rolling_avg'] = (
+    data['q']
+    .ewm(span=window, adjust=False)
+    .mean()
+)
+
+
+
+#data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=True).mean()
 
 
 def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
@@ -169,6 +182,14 @@ def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
     ax.set_xlabel('Date')
     ax.set_ylabel(ylabel)
     ax.legend()
+
+def plot_time_series_subplot2(ax, x, y, ylabel, label, color, window):
+    rolling_avg = y.ewm(span=window, adjust=False).mean().where(y.notna())
+    ax.plot(x, y, label=label, color=color, alpha=0.5)
+    ax.plot(x, rolling_avg, label=f'{label} (Smoothed Avg)', color='black', linestyle='--')
+    ax.set_xlabel('Date')
+    ax.set_ylabel(ylabel)
+    ax.legend()    
 
 
 def plot_combined_time_series(data, window=12):
@@ -202,20 +223,50 @@ plot_combined_time_series(data)
 
 
 
-# I want to look at the correlation between some of the variables. 
-# rolling_avg = y.ewm(span=window, adjust=False).mean() 
-
 # The correlation between the conc at source and the conc at the measurement point
 
-corr_s_m = (data['ch4_ppb'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
+corr_s_m = (data['ch4_ppb'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'].where(data['q'].notna()))
 corr_t_m = (data['temp'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
 coor_s_w = (data['ws'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
 coor_m_w = (data['ws'].ewm(span=window, adjust=False).mean()).corr(data['ch4_ppb'].ewm(span=window, adjust=False).mean())
 corr_sc_q = (data['stability_class'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
 
 
-print(data)
-print(corr_s_m)
-print(coor_s_w)
-print(coor_m_w)
-print(corr_sc_q)
+
+
+
+# Bit of a testing area here
+
+data['ch4_ppb_ewm'] = data['ch4_ppb'].ewm(span=window, adjust=False).mean()
+data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
+data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
+
+# Define lag range
+max_lag = 30
+correlations = []
+
+# Calculate correlation for each lag
+for lag in range(-max_lag, max_lag + 1):
+    shifted_q_avg = data['q_rolling_avg'].shift(lag)
+    corr = data['ch4_ppb_ewm'].corr(shifted_q_avg)
+    correlations.append((lag, corr))
+
+# Find optimal lag
+optimal_lag, max_corr = max(correlations, key=lambda x: x[1])
+
+print(f"Optimal lag: {optimal_lag}")
+print(f"Maximum correlation: {max_corr}")
+
+# Optionally, visualize the results
+import matplotlib.pyplot as plt
+
+lags, corr_values = zip(*correlations)
+plt.plot(lags, corr_values, marker='o')
+plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
+plt.title('Correlation vs Lag')
+plt.xlabel('Lag')
+plt.ylabel('Correlation Coefficient')
+plt.grid(True)
+plt.show()
+
+
