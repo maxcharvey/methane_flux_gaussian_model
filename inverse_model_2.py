@@ -5,6 +5,7 @@ import flux_model as model
 import pandas as pd
 from scipy.special import erf
 import openpyxl
+import seaborn as sns
 
 # Load the dataset
 file_path = 'data/msr_ch4_met_hrly_310524_270924.csv'
@@ -88,8 +89,8 @@ sampler = np.asarray([0.144343, 52.237111])
 x_dist = np.asarray([(sampler[0]-landfill[0])*110000*np.cos(sampler[1]), 0])
 y_dist = np.asarray([0, (sampler[1]-landfill[1])*110000])
 
-x_dist2 = np.asarray([(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
-y_dist2 = np.asarray([(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
+x_dist2 = np.asarray([-(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
+y_dist2 = np.asarray([0, -(sampler[0]-sewage[0])*110000*np.cos(sampler[1])])
 
 
 # Now need to turn these into distance for each timestep based upon dot produt with wind vector 
@@ -100,9 +101,17 @@ def find_relative_distance(row):
     y_rel_dist = np.dot(y_dist, y_unit) + np.dot(x_dist, y_unit)
     return x_rel_dist, y_rel_dist
 
+def find_relative_distance2(row):
+    x_unit = row['x_hat']
+    y_unit = row['y_hat']
+    x_rel_dist2 = np.dot(x_dist2, x_unit) + np.dot(y_dist2, x_unit)
+    y_rel_dist2 = np.dot(y_dist2, y_unit) + np.dot(x_dist2, y_unit)
+    return x_rel_dist2, y_rel_dist2
+
 
 data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
-
+data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
+print(data)
 
 # Define some parameters that we need for the function below 
 z=10
@@ -112,10 +121,54 @@ background=1.978524191
 
 def inverse_conc_line(row):
 
-    if row['x_rel_dist'] <= 100:
-        return np.nan  # or return None
+    if 60<=row['wd'] <= 190:
+        A = row['A']
+        B = row['B']
+        C = row['C']
+        D = row['D']
+        x = row['x_rel_dist2']
+        y = row['y_rel_dist2']
+        methane = row['ch4_ppm']
+        u = row['ws']
 
-    else: 
+        # Calculating sigma_z
+        sigma_z = A * (x*0.001) ** B
+
+        # Angle term required
+        angle_deg = C - D *np.log(x/1000)
+        angle_rad = np.radians(angle_deg)
+
+        # Calculate the tangent term 
+        tan_term = np.tan(angle_rad)
+
+        # Constants
+        constant = 465.11628
+
+        # Calculate sigma_y
+        sigma_y = constant * x * 0.001 * tan_term 
+
+        # Denominator from the plume equation 
+        denominator = 2 * np.sqrt(2 * np.pi) * u * A * (x/1000)**B
+
+        # Exponential terms:
+        exp1 = np.exp(-((z - h) ** 2) / (2 * sigma_z ** 2))
+        exp2 = np.exp(-((z + h) ** 2) / (2 * sigma_z ** 2))
+
+        # Error functions:  
+        sqrt_2 = np.sqrt(2)
+        y1 = (y + ls / 2) / (sqrt_2 * sigma_y)
+        y2 = (y - ls / 2) / (sqrt_2 * sigma_y)
+
+        # Error function differences:
+        erf_diff = erf(y1) - erf(y2)
+        erf_diff = np.maximum(erf_diff, 1e-2)
+
+        # Calculating the flux q
+        q = (methane-background) * denominator / ((exp1 + exp2) * erf_diff)
+
+        return q/1000
+
+    elif row['wd'] < 60 or row['wd'] > 290: 
         A = row['A']
         B = row['B']
         C = row['C']
@@ -162,6 +215,11 @@ def inverse_conc_line(row):
 
         return q/1000
 
+    else:
+        return np.nan
+    
+print(data)
+
 data['q'] = data.apply(inverse_conc_line, axis=1)
 window=12
 
@@ -183,7 +241,7 @@ def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
     ax.set_xlabel('Date')
     ax.set_ylabel(ylabel)
     ax.legend()
-   
+
 
 def plot_combined_time_series(data, window=12):
     fig, axes = plt.subplots(7, 1, figsize=(12, 9), sharex=True)
@@ -214,59 +272,24 @@ def plot_combined_time_series(data, window=12):
 
 plot_combined_time_series(data)
 
-
-
-# The correlation between the conc at source and the conc at the measurement point
-
-corr_s_m = (data['ch4_ppb'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'].where(data['q'].notna()))
-corr_t_m = (data['temp'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
-coor_s_w = (data['ws'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
-coor_m_w = (data['ws'].ewm(span=window, adjust=False).mean()).corr(data['ch4_ppb'].ewm(span=window, adjust=False).mean())
-corr_sc_q = (data['stability_class'].ewm(span=window, adjust=False).mean()).corr(data['q_rolling_avg'])
-
-
 corr_new = (data['q'].corr(data['ch4_ppb']))
 print(corr_new)
-
-
-# Bit of a testing area here
 
 data['ch4_ppb_ewm'] = data['ch4_ppb'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
 
-# Define lag range
-max_lag = 30
-correlations = []
-
-# Calculate correlation for each lag
-for lag in range(-max_lag, max_lag + 1):
-    shifted_q_avg = data['q_rolling_avg'].shift(lag)
-    corr = data['ch4_ppb_ewm'].corr(shifted_q_avg)
-    correlations.append((lag, corr))
-
-# Find optimal lag
-optimal_lag, max_corr = max(correlations, key=lambda x: x[1])
-
-print(f"Optimal lag: {optimal_lag}")
-print(f"Maximum correlation: {max_corr}")
-
-# Optionally, visualize the results
-import matplotlib.pyplot as plt
+corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
+print(corr_new_2)
 
 
+# Plot a correlation matrix for the dataframe for certain columns
 
-lags, corr_values = zip(*correlations)
-plt.plot(lags, corr_values, marker='o')
-plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
-plt.title('Correlation vs Lag')
-plt.xlabel('Lag')
-plt.ylabel('Correlation Coefficient')
-plt.grid(True)
-plt.show()
+selected_columns = ['ch4_ppb', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class']  # Replace with your column names
+selected_data = data[selected_columns]
+corr_matrix = selected_data.corr()
 
-fig, ax3 = plt.subplots(figsize=(12, 6))
-ax3.scatter(data['q'], data['ch4_ppb'], label='Methane Concentration vs. Source Flux', color='tab:blue', alpha=0.5)
-ax3.set_yscale('log')
-ax3.set_xscale('log')
+# Generate heat map of corr_matrix 
+plt.figure(figsize=(12, 9))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
 plt.show()
