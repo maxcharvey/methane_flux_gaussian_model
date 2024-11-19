@@ -111,7 +111,7 @@ def find_relative_distance2(row):
 
 data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
 data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
-print(data)
+
 
 # Define some parameters that we need for the function below 
 z=10
@@ -129,8 +129,8 @@ def inverse_conc_line(row):
         x = row['x_rel_dist2']
         y = row['y_rel_dist2']
         methane = row['ch4_ppm']
-        u = row['ws']
-
+        u = np.maximum(row['ws'], 0.5)
+        
         # Calculating sigma_z
         sigma_z = A * (x*0.001) ** B
 
@@ -176,7 +176,7 @@ def inverse_conc_line(row):
         x = row['x_rel_dist']
         y = row['y_rel_dist']
         methane = row['ch4_ppm']
-        u = row['ws']
+        u = np.maximum(row['ws'], 0.5)
 
         # Calculating sigma_z
         sigma_z = A * (x*0.001) ** B
@@ -218,20 +218,10 @@ def inverse_conc_line(row):
     else:
         return np.nan
     
-print(data)
+
 
 data['q'] = data.apply(inverse_conc_line, axis=1)
 window=12
-
-data['q_rolling_avg'] = (
-    data['q']
-    .ewm(span=window, adjust=False)
-    .mean()
-)
-
-
-
-#data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=True).mean()
 
 
 def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
@@ -285,11 +275,18 @@ print(corr_new_2)
 
 # Plot a correlation matrix for the dataframe for certain columns
 
-selected_columns = ['ch4_ppb', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class']  # Replace with your column names
+selected_columns = ['ch4_ppm', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class']  # Replace with your column names
 selected_data = data[selected_columns]
 corr_matrix = selected_data.corr()
 
 # Generate heat map of corr_matrix 
 plt.figure(figsize=(12, 9))
 sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
+plt.show()
+
+fig, ax2 = plt.subplots(figsize=(12,6))
+ax3=ax2.twinx()
+ax3.plot(data['date'], data['q'], color='blue', label='q')
+ax2.plot(data['date'], data['ch4_ppb'], color='red', label='ch4_ppb')
+
 plt.show()
