@@ -6,6 +6,8 @@ import pandas as pd
 from scipy.special import erf
 import openpyxl
 import seaborn as sns
+import warnings
+warnings.filterwarnings("ignore", category=Warning)
 
 # Load the dataset
 file_path = 'data/msr_ch4_met_hrly_310524_270924.csv'
@@ -129,7 +131,8 @@ def inverse_conc_line(row):
         x = row['x_rel_dist2']
         y = row['y_rel_dist2']
         methane = row['ch4_ppm']
-        u = np.maximum(row['ws'], 0.5)
+        u = row['ws']
+        #u = np.maximum(row['ws'], 0.5)
         
         # Calculating sigma_z
         sigma_z = A * (x*0.001) ** B
@@ -176,7 +179,8 @@ def inverse_conc_line(row):
         x = row['x_rel_dist']
         y = row['y_rel_dist']
         methane = row['ch4_ppm']
-        u = np.maximum(row['ws'], 0.5)
+        u = row['ws']
+        #u = np.maximum(row['ws'], 0.5)
 
         # Calculating sigma_z
         sigma_z = A * (x*0.001) ** B
@@ -233,6 +237,13 @@ def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
     ax.legend()
 
 
+# Testing this here:
+data['co2_rolling_average'] = data['co2_ppm'].ewm(span=12, adjust=False).mean()
+data['ch4_ppb'] =  data['ch4_ppb'] - 1.978524191
+data['ch4_ppm'] =  data['ch4_ppm'] - 1978.524191
+data['co2_ppm'] =  data['co2_ppm'] - data['co2_rolling_average']
+
+
 def plot_combined_time_series(data, window=12):
     fig, axes = plt.subplots(7, 1, figsize=(12, 9), sharex=True)
 
@@ -255,27 +266,32 @@ def plot_combined_time_series(data, window=12):
     # Plot calculated methane flux from inverse model
     plot_time_series_subplot(axes[5], data['date'], data['q'], 'Source flux', 'Source flux', 'tab:cyan', window)
     
-    plot_time_series_subplot(axes[6], data['date'], data['wd'], 'Wind direction', 'Wind direction', 'tab:cyan', window)
+    plot_time_series_subplot(axes[6], data['date'], data['co2_ppm'], 'Wind direction', 'Wind direction', 'tab:cyan', window)
 
     plt.tight_layout()
     plt.show()
 
 plot_combined_time_series(data)
 
-corr_new = (data['q'].corr(data['ch4_ppb']))
-print(corr_new)
+
 
 data['ch4_ppb_ewm'] = data['ch4_ppb'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
 
+corr_new = (data['q'].corr(data['ch4_ppb']))
 corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
-print(corr_new_2)
+print(f'Correlation: {corr_new}')
+print(f'Correlation of rolling averages {corr_new_2}')
 
 
 # Plot a correlation matrix for the dataframe for certain columns
 
-selected_columns = ['ch4_ppm', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class']  # Replace with your column names
+# Potentially want to see what happens when you remove a background CO2 conc and background ch4 conc
+
+
+
+selected_columns = ['ch4_ppm', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class', 'co2_ppm']  # Replace with your column names
 selected_data = data[selected_columns]
 corr_matrix = selected_data.corr()
 

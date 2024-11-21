@@ -270,3 +270,5 @@ ax3.scatter(data['q'], data['ch4_ppb'], label='Methane Concentration vs. Source 
 ax3.set_yscale('log')
 ax3.set_xscale('log')
 plt.show()
+
+print(data)
