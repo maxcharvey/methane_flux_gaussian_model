@@ -251,7 +251,7 @@ def plot_combined_time_series(data, window=12):
     plot_time_series_subplot(axes[0], data['date'], data['temp'], 'Temperature (°C)', 'Temperature (°C)', 'tab:red', window)
 
     # Plot Methane Concentration
-    plot_time_series_subplot(axes[1], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
+    plot_time_series_subplot(axes[4], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
 
     # Plot Relative Humidity
     plot_time_series_subplot(axes[2], data['date'], data['rh'], 'Relative Humidity (%)', 'Relative Humidity', 'tab:blue', window)
@@ -261,10 +261,10 @@ def plot_combined_time_series(data, window=12):
 
     # Plot Stability Class
     stability_class_numeric = data['stability_class'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5})
-    plot_time_series_subplot(axes[4], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
+    plot_time_series_subplot(axes[1], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
     
     # Plot calculated methane flux from inverse model
-    plot_time_series_subplot(axes[5], data['date'], data['q'], 'Source flux', 'Source flux', 'tab:cyan', window)
+    plot_time_series_subplot(axes[5], data['date'], data['q'], 'Source flux (ppb/meter)', 'Source flux', 'tab:cyan', window)
     
     plot_time_series_subplot(axes[6], data['date'], data['co2_ppm'], 'Wind direction', 'Wind direction', 'tab:cyan', window)
 
@@ -281,15 +281,13 @@ data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
 
 corr_new = (data['q'].corr(data['ch4_ppb']))
 corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
-print(f'Correlation: {corr_new}')
-print(f'Correlation of rolling averages {corr_new_2}')
+print(f'R squared: {corr_new**2}')
+print(f'R squared of rolling averages {corr_new_2**2}')
 
 
 # Plot a correlation matrix for the dataframe for certain columns
 
 # Potentially want to see what happens when you remove a background CO2 conc and background ch4 conc
-
-
 
 selected_columns = ['ch4_ppm', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class', 'co2_ppm']  # Replace with your column names
 selected_data = data[selected_columns]

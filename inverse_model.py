@@ -192,7 +192,7 @@ def plot_combined_time_series(data, window=12):
     plot_time_series_subplot(axes[0], data['date'], data['temp'], 'Temperature (°C)', 'Temperature (°C)', 'tab:red', window)
 
     # Plot Methane Concentration
-    plot_time_series_subplot(axes[1], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
+    plot_time_series_subplot(axes[4], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
 
     # Plot Relative Humidity
     plot_time_series_subplot(axes[2], data['date'], data['rh'], 'Relative Humidity (%)', 'Relative Humidity', 'tab:blue', window)
@@ -202,7 +202,7 @@ def plot_combined_time_series(data, window=12):
 
     # Plot Stability Class
     stability_class_numeric = data['stability_class'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5})
-    plot_time_series_subplot(axes[4], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
+    plot_time_series_subplot(axes[1], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
     
     # Plot calculated methane flux from inverse model
     plot_time_series_subplot(axes[5], data['date'], data['q'], 'Source flux', 'Source flux', 'tab:cyan', window)
