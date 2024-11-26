@@ -47,12 +47,6 @@ data['q'] = data.apply(inverse_conc_line, axis=1)
 window=12
 
 
-# Now we can do some differnt plottings here: 
-
-# In particular let's look at applying a sinusoidal offset - we want to optimise a sinusoidal offset to the CO2 data:
-
-print(data)
-
 # We can use the curve_fit function from scipy to fit a sinusoidal function to the data
 # The function we want to fit is of the form:
 # f(x) = A * sin(B * x + C) + Dx + E
@@ -75,14 +69,16 @@ data['q_1'] = data['q'].where((data['wd'] < 60) | (data['wd'] > 290))
 # Corrected condition for 'q_2'
 data['q_2'] = data['q'].where((data['wd'] >= 60) & (data['wd'] <= 190))
 
+data['q_grams'] = ppm_to_g_m3(data['q'])
 
 
 def plot_time_series_subplot(ax, x, y, ylabel, label, color, window, alpha):
     rolling_avg = y.ewm(span=window, adjust=False).mean()
     ax.plot(x, y, label=label, color=color, alpha=alpha)
     ax.plot(x, rolling_avg, label=f'{label} (Smoothed Avg)', color='black', linestyle='--')
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(ylabel, fontsize=8)
     ax.legend()
+
 
 def plot_time_series_subplot_split(ax, x, y, ylabel, label, color, window, alpha):
     ax.plot(x, y, label=label, color=color, alpha=alpha)
@@ -94,14 +90,13 @@ def plot_combined_time_series2(data, window=12):
     fig, axes = plt.subplots(4, 1, figsize=(12, 7), sharex=True)
 
     # Plot Methane Concentration
-    plot_time_series_subplot(axes[0], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:blue', window, 0.5)
+    plot_time_series_subplot(axes[0], data['date'], data['ch4_ppm'], 'Methane Concentration (ppm)', 'Methane (CH₄)', 'tab:blue', window, 0.5)
     
-
-    plot_time_series_subplot(axes[1], data['date'], data['q'], 'Source flux (ppb/meter/sec)', 'Methane (CH₄)', 'tab:orange', window, 0.5)
+    plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
     # Plot calculated methane flux from inverse model
-    plot_time_series_subplot_split(axes[2], data['date'], data['q_1'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:red', window, 0.75)
-    plot_time_series_subplot_split(axes[2], data['date'], data['q_2'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:green', window, 0.75)
-    plot_time_series_subplot(axes[2], data['date'], data['q'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:gray', window, 0.35)
+    plot_time_series_subplot_split(axes[2], data['date'], data['q_1'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:red', window, 0.75)
+    plot_time_series_subplot_split(axes[2], data['date'], data['q_2'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
+    plot_time_series_subplot(axes[2], data['date'], data['q'], 'Source flux (ppm/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
 
     # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
     plot_time_series_subplot(axes[3], data['date'], data['offset_co2'], 'CO2 Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)

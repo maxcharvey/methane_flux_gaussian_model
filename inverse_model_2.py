@@ -152,7 +152,7 @@ def inverse_conc_line(row):
         # Calculating the flux q
         q = (methane-background) * denominator / ((exp1 + exp2) * erf_diff)
 
-        return q/1000
+        return q
 
     elif row['wd'] < 60 or row['wd'] > 290: 
         A = row['A']
@@ -200,11 +200,44 @@ def inverse_conc_line(row):
         # Calculating the flux q
         q = (methane-background) * denominator / ((exp1 + exp2) * erf_diff)
 
-        return q/1000
+        return q
 
     else:
         return np.nan
 
+
+def g_m3_to_ppm(methane_g_m3, temperature=273.15, pressure=101325):
+    # Constants
+    MOLAR_MASS_METHANE = 16.04  # g/mol for methane (CH4)
+    R = 8.314  # J/(mol*K), ideal gas constant
+    
+    # Calculate the molar concentration of methane in mol/m^3
+    molar_concentration = methane_g_m3 / MOLAR_MASS_METHANE  # mol/m^3
+    
+    # Calculate volume at specified conditions (temperature in Kelvin, pressure in Pascals)
+    molar_volume = R * temperature / pressure  # in m^3/mol (ideal gas law)
+    
+    # Convert molar concentration to ppm
+    ppm = molar_concentration / molar_volume * 1e6
+    
+    return ppm
+
+
+def ppm_to_g_m3(methane_ppm, temperature=273.15, pressure=101325):
+    # Constants
+    MOLAR_MASS_METHANE = 16.04  # g/mol for methane (CH4)
+    R = 8.314  # J/(mol*K), ideal gas constant
+    
+    # Calculate the molar volume at specified conditions (temperature in Kelvin, pressure in Pascals)
+    molar_volume = R * temperature / pressure  # in m^3/mol (ideal gas law)
+    
+    # Calculate molar concentration in mol/m^3
+    molar_concentration = methane_ppm / 1e6 * molar_volume  # mol/m^3
+    
+    # Convert molar concentration to g/m^3
+    methane_g_m3 = molar_concentration * MOLAR_MASS_METHANE
+    
+    return methane_g_m3
 
 
 if __name__ == '__main__':
