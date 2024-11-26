@@ -13,7 +13,7 @@ try:
     data['date'] = pd.to_datetime(data['date'], format='%Y-%m-%d %H:%M:%S')
 
     # Filter data to only include June and July 2024
-    data = data[(data['date'] >= '2024-06-01') & (data['date'] <= '2024-07-01')]
+    data = data[(data['date'] >= '2024-06-01') & (data['date'] <= '2024-7-01')]
 except FileNotFoundError:
     print(f"Error: The file {file_path} was not found.")
     exit()
@@ -69,29 +69,43 @@ popt, pcov = curve_fit(sinusoidal, x, y)
 
 # Generate the y values for the fitted function
 data['offset_co2'] = y - sinusoidal(x, *popt) 
+# Corrected condition for 'q_1'
+data['q_1'] = data['q'].where((data['wd'] < 60) | (data['wd'] > 290))
+
+# Corrected condition for 'q_2'
+data['q_2'] = data['q'].where((data['wd'] >= 60) & (data['wd'] <= 190))
 
 
-def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
+
+def plot_time_series_subplot(ax, x, y, ylabel, label, color, window, alpha):
     rolling_avg = y.ewm(span=window, adjust=False).mean()
-    ax.plot(x, y, label=label, color=color, alpha=0.5)
+    ax.plot(x, y, label=label, color=color, alpha=alpha)
     ax.plot(x, rolling_avg, label=f'{label} (Smoothed Avg)', color='black', linestyle='--')
-    ax.set_xlabel('Date')
     ax.set_ylabel(ylabel)
+    ax.legend()
+
+def plot_time_series_subplot_split(ax, x, y, ylabel, label, color, window, alpha):
+    ax.plot(x, y, label=label, color=color, alpha=alpha)
+    ax.set_xlabel('Date')
     ax.legend()
 
 
 def plot_combined_time_series2(data, window=12):
-    fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(12, 7), sharex=True)
 
     # Plot Methane Concentration
-    plot_time_series_subplot(axes[0], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
+    plot_time_series_subplot(axes[0], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:blue', window, 0.5)
     
-    # Plot calculated methane flux from inverse model
-    plot_time_series_subplot(axes[1], data['date'], data['q'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:cyan', window)
-    
-    # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
-    plot_time_series_subplot(axes[2], data['date'], data['offset_co2'], 'CO2 Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window)
 
+    plot_time_series_subplot(axes[1], data['date'], data['q'], 'Source flux (ppb/meter/sec)', 'Methane (CH₄)', 'tab:orange', window, 0.5)
+    # Plot calculated methane flux from inverse model
+    plot_time_series_subplot_split(axes[2], data['date'], data['q_1'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:red', window, 0.75)
+    plot_time_series_subplot_split(axes[2], data['date'], data['q_2'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:green', window, 0.75)
+    plot_time_series_subplot(axes[2], data['date'], data['q'], 'Source flux (ppb/meter/sec)', 'Source flux', 'tab:gray', window, 0.35)
+
+    # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
+    plot_time_series_subplot(axes[3], data['date'], data['offset_co2'], 'CO2 Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
+    axes[3].set_xlabel('Date')
     plt.tight_layout()
     plt.show()
 
@@ -109,5 +123,3 @@ corr_matrix = selected_data.corr()
 plt.figure(figsize=(12, 9))
 sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
 plt.show()
-
-

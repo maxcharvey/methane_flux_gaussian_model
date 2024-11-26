@@ -203,7 +203,7 @@ def inverse_conc_line(row):
         return q/1000
 
     else:
-        return np.na
+        return np.nan
 
 
 
