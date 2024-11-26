@@ -29,8 +29,17 @@ except pd.errors.ParserError:
     print(f"Error: The file {file_path} could not be parsed.")
     exit()
 
+# Some spatial data for the diferent plume locations:
+landfill = np.asarray([0.1436, 52.246])
+sewage = np.asarray([0.157, 52.2335])
+sampler = np.asarray([0.144343, 52.237111])
+x_dist = np.asarray([(sampler[0]-landfill[0])*110000*np.cos(sampler[1]), 0])
+y_dist = np.asarray([0, (sampler[1]-landfill[1])*110000])
 
-# Function to determine Pasquill-Gifford stability class
+x_dist2 = np.asarray([-(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
+y_dist2 = np.asarray([0, -(sampler[0]-sewage[0])*110000*np.cos(sampler[1])])
+
+
 def determine_stability_class(row):
     hour = row['date'].hour
     wind_speed = row['ws']
@@ -50,9 +59,6 @@ def determine_stability_class(row):
         else:
             return 5  # Neutral
 
-# Apply the function to the dataframe
-data['stability_class'] = data.apply(determine_stability_class, axis=1)
-
 
 def find_coeffs(row):
     case = row['stability_class']
@@ -63,10 +69,6 @@ def find_coeffs(row):
     return A, B, C, D
 
 
-data[['A', 'B', 'C', 'D']] = data.apply(find_coeffs, axis=1, result_type='expand')
-
-
-# Next problem is to try and find the correct x and y values based upon the wind direction
 def find_basis_vectors(row):
     # Assuming the wind direction is in degrees and in a column named 'wind_direction'
     wind_direction = np.deg2rad(row['wd'])  # Convert degrees to radians
@@ -80,28 +82,13 @@ def find_basis_vectors(row):
     return x_hat, y_hat
 
 
-data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
-
-
-# Introduce the fixed lat-lon coords for the points of interest
-landfill = np.asarray([0.1436, 52.246])
-sewage = np.asarray([0.157, 52.2335])
-sampler = np.asarray([0.144343, 52.237111])
-
-x_dist = np.asarray([(sampler[0]-landfill[0])*110000*np.cos(sampler[1]), 0])
-y_dist = np.asarray([0, (sampler[1]-landfill[1])*110000])
-
-x_dist2 = np.asarray([-(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
-y_dist2 = np.asarray([0, -(sampler[0]-sewage[0])*110000*np.cos(sampler[1])])
-
-
-# Now need to turn these into distance for each timestep based upon dot produt with wind vector 
 def find_relative_distance(row):
     x_unit = row['x_hat']
     y_unit = row['y_hat']
     x_rel_dist = np.dot(x_dist, x_unit) + np.dot(y_dist, x_unit)
     y_rel_dist = np.dot(y_dist, y_unit) + np.dot(x_dist, y_unit)
     return x_rel_dist, y_rel_dist
+
 
 def find_relative_distance2(row):
     x_unit = row['x_hat']
@@ -111,18 +98,14 @@ def find_relative_distance2(row):
     return x_rel_dist2, y_rel_dist2
 
 
-data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
-data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
-
-
 # Define some parameters that we need for the function below 
 z=10
 h=10
 ls=500
 background=1.978524191
 
-def inverse_conc_line(row):
 
+def inverse_conc_line(row):
     if 60<=row['wd'] <= 190:
         A = row['A']
         B = row['B']
@@ -220,87 +203,63 @@ def inverse_conc_line(row):
         return q/1000
 
     else:
-        return np.nan
-    
+        return np.na
 
 
-data['q'] = data.apply(inverse_conc_line, axis=1)
-window=12
+
+if __name__ == '__main__':
+
+    data['stability_class'] = data.apply(determine_stability_class, axis=1)
+    data[['A', 'B', 'C', 'D']] = data.apply(find_coeffs, axis=1, result_type='expand')
+    data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
+
+    # Introduce the fixed lat-lon coords for the points of interest
+    landfill = np.asarray([0.1436, 52.246])
+    sewage = np.asarray([0.157, 52.2335])
+    sampler = np.asarray([0.144343, 52.237111])
+
+    x_dist = np.asarray([(sampler[0]-landfill[0])*110000*np.cos(sampler[1]), 0])
+    y_dist = np.asarray([0, (sampler[1]-landfill[1])*110000])
+
+    x_dist2 = np.asarray([-(sampler[0]-sewage[0])*110000*np.cos(sampler[1]), 0])
+    y_dist2 = np.asarray([0, -(sampler[0]-sewage[0])*110000*np.cos(sampler[1])])
+
+    data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
+    data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
+
+    data['q'] = data.apply(inverse_conc_line, axis=1)
+    window=12
+
+    # Applyiing the necessary background offset for the methane 
+    data['co2_rolling_average'] = data['co2_ppm'].ewm(span=12, adjust=False).mean()
+    data['ch4_ppb'] =  data['ch4_ppb'] - 1.978524191
+    data['ch4_ppm'] =  data['ch4_ppm'] - 1978.524191
+
+    # Let's attempt to m ake the offset for the CO2 sinusoidal...
+    data['co2_ppm'] =  data['co2_ppm'] - data['co2_rolling_average']
+
+    data['ch4_ppb_ewm'] = data['ch4_ppb'].ewm(span=window, adjust=False).mean()
+    data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
+    data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
+
+    corr_new = (data['q'].corr(data['ch4_ppb']))
+    corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
+    print(f'R squared: {corr_new**2}')
+    print(f'R squared of rolling averages {corr_new_2**2}')
 
 
-def plot_time_series_subplot(ax, x, y, ylabel, label, color, window):
-    rolling_avg = y.ewm(span=window, adjust=False).mean()
-    ax.plot(x, y, label=label, color=color, alpha=0.5)
-    ax.plot(x, rolling_avg, label=f'{label} (Smoothed Avg)', color='black', linestyle='--')
-    ax.set_xlabel('Date')
-    ax.set_ylabel(ylabel)
-    ax.legend()
+    # Plot a correlation matrix for the dataframe for certain columns
 
+    # Potentially want to see what happens when you remove a background CO2 conc and background ch4 conc
 
-# Testing this here:
-data['co2_rolling_average'] = data['co2_ppm'].ewm(span=12, adjust=False).mean()
-data['ch4_ppb'] =  data['ch4_ppb'] - 1.978524191
-data['ch4_ppm'] =  data['ch4_ppm'] - 1978.524191
-data['co2_ppm'] =  data['co2_ppm'] - data['co2_rolling_average']
+    selected_columns = ['ch4_ppm', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class', 'co2_ppm']  # Replace with your column names
+    selected_data = data[selected_columns]
+    corr_matrix = selected_data.corr()
 
-
-def plot_combined_time_series(data, window=12):
-    fig, axes = plt.subplots(7, 1, figsize=(12, 9), sharex=True)
-
-    # Plot Temperature
-    plot_time_series_subplot(axes[0], data['date'], data['temp'], 'Temperature (°C)', 'Temperature (°C)', 'tab:red', window)
-
-    # Plot Methane Concentration
-    plot_time_series_subplot(axes[4], data['date'], data['ch4_ppb'], 'Methane Concentration (ppb)', 'Methane (CH₄)', 'tab:green', window)
-
-    # Plot Relative Humidity
-    plot_time_series_subplot(axes[2], data['date'], data['rh'], 'Relative Humidity (%)', 'Relative Humidity', 'tab:blue', window)
-
-    # Plot Wind Speed
-    plot_time_series_subplot(axes[3], data['date'], data['ws'], 'Wind Speed (units)', 'Wind Speed', 'tab:purple', window)
-
-    # Plot Stability Class
-    stability_class_numeric = data['stability_class'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5})
-    plot_time_series_subplot(axes[1], data['date'], data['stability_class'], 'Stability Class', 'Stability Class', 'tab:cyan', window)
-    
-    # Plot calculated methane flux from inverse model
-    plot_time_series_subplot(axes[5], data['date'], data['q'], 'Source flux (ppb/meter)', 'Source flux', 'tab:cyan', window)
-    
-    plot_time_series_subplot(axes[6], data['date'], data['co2_ppm'], 'Wind direction', 'Wind direction', 'tab:cyan', window)
-
-    plt.tight_layout()
+    # Generate heat map of corr_matrix 
+    plt.figure(figsize=(12, 9))
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
     plt.show()
 
-plot_combined_time_series(data)
 
-
-
-data['ch4_ppb_ewm'] = data['ch4_ppb'].ewm(span=window, adjust=False).mean()
-data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
-data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
-
-corr_new = (data['q'].corr(data['ch4_ppb']))
-corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
-print(f'R squared: {corr_new**2}')
-print(f'R squared of rolling averages {corr_new_2**2}')
-
-
-# Plot a correlation matrix for the dataframe for certain columns
-
-# Potentially want to see what happens when you remove a background CO2 conc and background ch4 conc
-
-selected_columns = ['ch4_ppm', 'ch4_ppb', 'q', 'ws', 'temp', 'rh', 'stability_class', 'co2_ppm']  # Replace with your column names
-selected_data = data[selected_columns]
-corr_matrix = selected_data.corr()
-
-# Generate heat map of corr_matrix 
-plt.figure(figsize=(12, 9))
-sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
-plt.show()
-
-fig, ax2 = plt.subplots(figsize=(12,6))
-ax3=ax2.twinx()
-ax3.plot(data['date'], data['q'], color='blue', label='q')
-ax2.plot(data['date'], data['ch4_ppb'], color='red', label='ch4_ppb')
-
-plt.show()
+    plt.show()
