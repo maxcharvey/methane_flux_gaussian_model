@@ -104,6 +104,8 @@ h=10
 ls=500
 background=1.978524191
 
+threshold=1e-4
+
 
 def inverse_conc_line(row):
     if 60<=row['wd'] <= 190:
@@ -147,7 +149,7 @@ def inverse_conc_line(row):
 
         # Error function differences:
         erf_diff = erf(y1) - erf(y2)
-        erf_diff = np.maximum(erf_diff, 1e-2)
+        erf_diff = np.maximum(erf_diff, threshold)
 
         # Calculating the flux q
         q = (methane-background) * denominator / ((exp1 + exp2) * erf_diff)
@@ -195,7 +197,7 @@ def inverse_conc_line(row):
 
         # Error function differences:
         erf_diff = erf(y1) - erf(y2)
-        erf_diff = np.maximum(erf_diff, 1e-2)
+        erf_diff = np.maximum(erf_diff, threshold)
 
         # Calculating the flux q
         q = (methane-background) * denominator / ((exp1 + exp2) * erf_diff)
