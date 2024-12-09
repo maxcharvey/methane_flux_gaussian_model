@@ -90,16 +90,17 @@ def plot_time_series_subplot_split(ax, x, y, ylabel, label, color, window, alpha
 
 def plot_combined_time_series2(data, window=12):
     #fig, axes = plt.subplots(4, 1, figsize=(12, 7), sharex=True)
-    fig, axes = plt.subplots(2, 1, figsize=(12, 5), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+
 
     # Plot Methane Concentration
-    plot_time_series_subplot(axes[0], data['date'], data['ch4_ppm'], 'Sampler Methane \n Concentration (ppm)', 'Methane (CH₄)', 'tab:green', window, 0.5)
+    plot_time_series_subplot(axes[0], data['date'], data['ch4_ppm'], 'Sampler Methane \n Concentration (ppm)', 'Methane (CH₄)', 'tab:purple', window, 0.5)
     
     plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
-    # Plot calculated methane flux from inverse model
-    #plot_time_series_subplot_split(axes[2], data['date'], data['q1_grams'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:red', window, 0.75)
-    #plot_time_series_subplot_split(axes[2], data['date'], data['q2_grams'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
-    #plot_time_series_subplot(axes[2], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
+    #Plot calculated methane flux from inverse model
+    plot_time_series_subplot_split(axes[2], data['date'], data['q1_grams'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:blue', window, 0.75)
+    plot_time_series_subplot_split(axes[2], data['date'], data['q2_grams'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
+    plot_time_series_subplot(axes[2], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
 
     # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
     #plot_time_series_subplot(axes[3], data['date'], data['offset_co2'], 'CO2 Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
@@ -134,11 +135,11 @@ data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
 
 filtered_data = data[data['q_grams'] < 0.75]
-print(np.nanmean(filtered_data['q_grams']))
+
 
 corr_new = (data['q'].corr(data['ch4_ppb']))
 corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
 print(f'R squared: {corr_new**2}')
 print(f'R squared of rolling averages {corr_new_2**2}')
-
+print(np.nanmean(filtered_data['q_grams']))
 
