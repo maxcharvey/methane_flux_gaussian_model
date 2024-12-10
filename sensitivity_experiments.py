@@ -48,6 +48,7 @@ data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=
 q_maxes = []
 threshold_values = np.logspace(-12,-1, 100)
 
+
 for i in range(len(threshold_values)):
     threshold = threshold_values[i]
     data['q'] = data.apply(lambda row: inverse_conc_line(row, threshold=threshold), axis=1)

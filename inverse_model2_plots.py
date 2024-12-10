@@ -45,7 +45,7 @@ y_dist2 = np.asarray([0, -(sampler[0]-sewage[0])*110000*np.cos(sampler[1])])
 data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
 data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
 
-data['q'] = data.apply(inverse_conc_line, axis=1)
+data['q'] = data.apply(lambda row: inverse_conc_line(row, threshold=1e-4), axis=1)
 window=12
 
 
@@ -98,18 +98,18 @@ def plot_combined_time_series2(data, window=12):
     # Plot Methane Concentration
     plot_time_series_subplot(axes[0], data['date'], data['ch4_ppm'], 'Sampler Methane \n Concentration (ppm)', 'Methane (CH₄)', 'tab:purple', window, 0.5)
     
-    #plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
+    plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
     #Plot calculated methane flux from inverse model
     #plot_time_series_subplot_split(axes[2], data['date'], data['q1_grams'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:blue', window, 0.75)
     #plot_time_series_subplot_split(axes[2], data['date'], data['q2_grams'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
     #plot_time_series_subplot(axes[2], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
 
     # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
-    plot_time_series_subplot(axes[1], data['date'], data['offset_co2'], 'Offeset sampler CO2 \n Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
+    #plot_time_series_subplot(axes[1], data['date'], data['offset_co2'], 'Offeset sampler CO2 \n Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
     
     #axes[3].set_xlabel('Date')
     axes[1].set_xlabel('Date', fontsize=12)
-    plt.savefig('inverse_model2_2plots.png', dpi=500)
+    #plt.savefig('inverse_model2_2plots.png', dpi=500)
     for a in axes:
         a.tick_params(axis='both', labelsize=12)
 

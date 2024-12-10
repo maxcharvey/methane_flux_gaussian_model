@@ -46,26 +46,27 @@ data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, 
 data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
 
 q_averages = []
-ls_values = np.linspace(100,800, 100)
+threshold_values = np.logspace(-20,-1, 200)
 
 
-for i in range(len(ls_values)):
+for i in range(len(threshold_values)):
     filtered_data=None
-    ls = ls_values[i]
-    data['q'] = data.apply(lambda row: inverse_conc_line(row, ls=ls), axis=1)
-    filtered_data = data[data['q'] < 0.75]
-    q_averages.append(np.nanmean(data['q']))
-
+    threshold = threshold_values[i]
+    data['q'] = data.apply(lambda row: inverse_conc_line(row, threshold=threshold), axis=1)
+    data['q_grams'] = ppm_to_g_m3(data['q'])
+    filtered_data = data[data['q_grams'] < 0.75]
+    temp = np.nanmean(filtered_data['q_grams']).real
+    q_averages.append(temp)
+    
+print(q_averages)
 
 fig, ax1 = plt.subplots(figsize=(10, 6))
-ax2 = ax1.twinx()
-ax1.plot(ls_values, ppm_to_g_m3(np.array(q_averages)*ls_values), 'b-')
-ax2.plot(ls_values, ppm_to_g_m3(np.array(q_averages)), 'r-')
-ax2.set_ylabel('Emission rate from \n line source (g/m/s)')
+ax1.plot(threshold_values, q_averages, 'b-')
 ax1.set_xlabel('Line source length (m)')
 ax1.set_ylabel('Total emission from \n line source (g/s)')
-
-
+ax1.set_xscale('log')  # Set the x-axis to a logarithmic scale
+ax1.set_yscale('log')  # Set the y-axis to a logarithmic scale
+#plt.savefig('sensitivity_experiment_3.png')
 
 plt.show()
 
