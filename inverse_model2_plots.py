@@ -25,6 +25,8 @@ except pd.errors.ParserError:
     exit()
 
 
+
+
 data['stability_class'] = data.apply(determine_stability_class, axis=1)
 data[['A', 'B', 'C', 'D']] = data.apply(find_coeffs, axis=1, result_type='expand')
 data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
@@ -90,24 +92,24 @@ def plot_time_series_subplot_split(ax, x, y, ylabel, label, color, window, alpha
 
 def plot_combined_time_series2(data, window=12):
     #fig, axes = plt.subplots(4, 1, figsize=(12, 7), sharex=True)
-    fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
 
     # Plot Methane Concentration
     plot_time_series_subplot(axes[0], data['date'], data['ch4_ppm'], 'Sampler Methane \n Concentration (ppm)', 'Methane (CH₄)', 'tab:purple', window, 0.5)
     
-    plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
+    #plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
     #Plot calculated methane flux from inverse model
-    plot_time_series_subplot_split(axes[2], data['date'], data['q1_grams'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:blue', window, 0.75)
-    plot_time_series_subplot_split(axes[2], data['date'], data['q2_grams'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
-    plot_time_series_subplot(axes[2], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
+    #plot_time_series_subplot_split(axes[2], data['date'], data['q1_grams'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:blue', window, 0.75)
+    #plot_time_series_subplot_split(axes[2], data['date'], data['q2_grams'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
+    #plot_time_series_subplot(axes[2], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
 
     # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
-    #plot_time_series_subplot(axes[3], data['date'], data['offset_co2'], 'CO2 Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
-    plt.savefig('inverse_model2_plots.png', dpi=500)
+    plot_time_series_subplot(axes[1], data['date'], data['offset_co2'], 'Offeset sampler CO2 \n Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
+    
     #axes[3].set_xlabel('Date')
     axes[1].set_xlabel('Date', fontsize=12)
-
+    plt.savefig('inverse_model2_2plots.png', dpi=500)
     for a in axes:
         a.tick_params(axis='both', labelsize=12)
 
@@ -123,16 +125,17 @@ plot_combined_time_series2(data)
 window=12
 
 # Applyiing the necessary background offset for the methane 
-data['co2_rolling_average'] = data['co2_ppm'].ewm(span=12, adjust=False).mean()
+data['co2_rolling_average'] = data['offset_co2'].ewm(span=12, adjust=False).mean()
+
+
 data['ch4_ppb'] =  data['ch4_ppb'] - 1.978524191
 data['ch4_ppm'] =  data['ch4_ppm'] - 1978.524191
 
-# Let's attempt to m ake the offset for the CO2 sinusoidal...
-data['co2_ppm'] =  data['co2_ppm'] - data['co2_rolling_average']
 
 data['ch4_ppb_ewm'] = data['ch4_ppb'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
+data['co2_ppm_ewm'] = data['co2_ppm'].ewm(span=window, adjust=False).mean()
 
 filtered_data = data[data['q_grams'] < 0.75]
 
@@ -143,3 +146,5 @@ print(f'R squared: {corr_new**2}')
 print(f'R squared of rolling averages {corr_new_2**2}')
 print(np.nanmean(filtered_data['q_grams']))
 
+corr_new2 = (data['ch4_ppb_ewm'].corr(data['co2_ppm_ewm']))
+print(corr_new2)

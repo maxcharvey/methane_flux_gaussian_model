@@ -101,13 +101,12 @@ def find_relative_distance2(row):
 # Define some parameters that we need for the function below 
 z=10
 h=10
-ls=500
 background=1.978524191
 
-threshold=1e-4
 
 
-def inverse_conc_line(row):
+
+def inverse_conc_line(row, threshold=1e-4, ls=500):
     if 60<=row['wd'] <= 190:
         A = row['A']
         B = row['B']
@@ -243,7 +242,6 @@ def ppm_to_g_m3(methane_ppm, temperature=273.15, pressure=101325):
 
 
 if __name__ == '__main__':
-
     data['stability_class'] = data.apply(determine_stability_class, axis=1)
     data[['A', 'B', 'C', 'D']] = data.apply(find_coeffs, axis=1, result_type='expand')
     data[['x_hat', 'y_hat']] = data.apply(find_basis_vectors, axis=1, result_type='expand')
