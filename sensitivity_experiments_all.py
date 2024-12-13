@@ -45,9 +45,20 @@ y_dist2 = np.asarray([0, -(sampler[0]-sewage[0])*110000*np.cos(sampler[1])])
 data[['x_rel_dist', 'y_rel_dist']] = data.apply(find_relative_distance, axis=1, result_type='expand')
 data[['x_rel_dist2', 'y_rel_dist2']] = data.apply(find_relative_distance2, axis=1, result_type='expand')
 
+q_maxes = []
+threshold_values = np.logspace(-12,-1, 100)
+
 q_averages = []
 ls_values = np.linspace(100,800, 100)
 
+q_averages2 = []
+threshold_values2 = np.logspace(-20,-1, 200)
+
+
+for i in range(len(threshold_values)):
+    threshold = threshold_values[i]
+    data['q'] = data.apply(lambda row: inverse_conc_line(row, threshold=threshold), axis=1)
+    q_maxes.append(np.nanmax(data['q']))
 
 for i in range(len(ls_values)):
     filtered_data=None
@@ -56,19 +67,42 @@ for i in range(len(ls_values)):
     filtered_data = data[data['q'] < 0.75]
     q_averages.append(np.nanmean(data['q']))
 
+for i in range(len(threshold_values2)):
+    filtered_data=None
+    threshold = threshold_values2[i]
+    data['q'] = data.apply(lambda row: inverse_conc_line(row, threshold=threshold), axis=1)
+    data['q_grams'] = ppm_to_g_m3(data['q'])
+    filtered_data = data[data['q_grams'] < 0.75]
+    temp = np.nanmean(filtered_data['q_grams']).real
+    q_averages2.append(temp)
 
-fig, ax1 = plt.subplots(figsize=(10, 6))
-ax2 = ax1.twinx()
-ax1.plot(ls_values, ppm_to_g_m3(np.array(q_averages)*ls_values), 'b-', label='Total emission from line source')
-ax2.plot(ls_values, ppm_to_g_m3(np.array(q_averages)), 'r-', label='Emission rate per unit length')
+fig, ax1 = plt.subplots(figsize=(10, 12), nrows=3)
+
+ax1[0].plot(threshold_values, ppm_to_g_m3(np.array(q_maxes)), 'k-')
+ax1[0].set_xscale('log')  # Set the x-axis to a logarithmic scale
+ax1[0].set_yscale('log')  # Set the y-axis to a logarithmic scale
+ax1[0].set_xlabel('Minimum Denominator Value')
+ax1[0].set_ylabel('Maximum Calculated Methane \n Flux Intensity (g/m/s)')
+
+
+ax2 = ax1[1].twinx()
+ax1[1].plot(ls_values, ppm_to_g_m3(np.array(q_averages)*ls_values), 'k-', label='Total emissions')
+ax2.plot(ls_values, ppm_to_g_m3(np.array(q_averages)), color='cyan', ls='-',alpha=0.5, label='Emission rate')
+
+
 ax2.set_ylabel('Emission rate from \n line source (g/m/s)')
-ax1.set_xlabel('Line source length (m)')
-ax1.set_ylabel('Total emission from \n line source (g/s)')
-ax1.legend()
-ax2.legend()
+ax1[1].set_xlabel('Line source length (m)')
+ax1[1].set_ylabel('Total emission from \n line source (g/s)')
+ax1[1].legend(loc='center left')
+ax2.legend(loc='center right')
 
-fig.savefig('sensitivity_experiment2.png')
+
+ax1[2].plot(threshold_values2, q_averages2, 'k-') 
+ax1[2].set_xlabel('Maximimum denominator value')
+ax1[2].set_ylabel('Total emission from \n line source (g/s)')
+ax1[2].set_xscale('log')  # Set the x-axis to a logarithmic scale
+ax1[2].set_yscale('log')  # Set the y-axis to a logarithmic scale
+
+
+plt.savefig('sensitivity_experiment_4.png')
 plt.show()
-
-
-

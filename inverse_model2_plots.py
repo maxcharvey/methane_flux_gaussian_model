@@ -3,6 +3,7 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 
 file_path = 'data/msr_ch4_met_hrly_310524_270924.csv'
@@ -13,7 +14,7 @@ try:
     data['date'] = pd.to_datetime(data['date'], format='%Y-%m-%d %H:%M:%S')
 
     # Filter data to only include June and July 2024
-    data = data[(data['date'] >= '2024-06-01') & (data['date'] <= '2024-7-01')]
+    data = data[(data['date'] >= '2024-06-01') & (data['date'] <= '2024-07-01')]
 except FileNotFoundError:
     print(f"Error: The file {file_path} was not found.")
     exit()
@@ -98,18 +99,18 @@ def plot_combined_time_series2(data, window=12):
     # Plot Methane Concentration
     plot_time_series_subplot(axes[0], data['date'], data['ch4_ppm'], 'Sampler Methane \n Concentration (ppm)', 'Methane (CH₄)', 'tab:purple', window, 0.5)
     
-    plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
+    #plot_time_series_subplot(axes[1], data['date'], data['q_grams'], 'Source flux \n (g/meter/sec)', 'Source Flux', 'tab:orange', window, 0.5)
     #Plot calculated methane flux from inverse model
     #plot_time_series_subplot_split(axes[2], data['date'], data['q1_grams'], 'Source flux (ppm/meter/sec)', 'Landfill Source Flux', 'tab:blue', window, 0.75)
     #plot_time_series_subplot_split(axes[2], data['date'], data['q2_grams'], 'Source flux (ppm/meter/sec)', 'Sewage Source Flux', 'tab:green', window, 0.75)
     #plot_time_series_subplot(axes[2], data['date'], data['q_grams'], 'Source flux (g/meter/sec)', 'Combined Source Flux', 'tab:gray', window, 0.35)
 
     # Need to try and look at a potential offset here for the CO2 that is based upon daily variation
-    #plot_time_series_subplot(axes[1], data['date'], data['offset_co2'], 'Offeset sampler CO2 \n Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
+    plot_time_series_subplot(axes[1], data['date'], data['offset_co2'], 'Offeset sampler CO2 \n Concentration (ppm)', 'CO2 (ppm)', 'tab:cyan', window, 0.5)
     
     #axes[3].set_xlabel('Date')
     axes[1].set_xlabel('Date', fontsize=12)
-    #plt.savefig('inverse_model2_2plots.png', dpi=500)
+    plt.savefig('inverse_model2_2plots.png', dpi=500)
     for a in axes:
         a.tick_params(axis='both', labelsize=12)
 
@@ -137,14 +138,41 @@ data['q_rolling_avg'] = data['q'].ewm(span=window, adjust=False).mean()
 data['q_rolling_avg'] = data['q_rolling_avg'].where(data['q'].notna())
 data['co2_ppm_ewm'] = data['co2_ppm'].ewm(span=window, adjust=False).mean()
 
+
+
 filtered_data = data[data['q_grams'] < 0.75]
 
 
 corr_new = (data['q'].corr(data['ch4_ppb']))
 corr_new_2 = data['ch4_ppb_ewm'].corr(data['q_rolling_avg'])
-print(f'R squared: {corr_new**2}')
-print(f'R squared of rolling averages {corr_new_2**2}')
-print(np.nanmean(filtered_data['q_grams']))
+#print(f'R squared: {corr_new**2}')
+#print(f'R squared of rolling averages {corr_new_2**2}')
+#print(np.nanmean(filtered_data['q_grams']))
 
 corr_new2 = (data['ch4_ppb_ewm'].corr(data['co2_ppm_ewm']))
-print(corr_new2)
+#print(corr_new2)
+
+# Let's look at how the CO2 values are distributed in terms of a normal distribution:
+
+alpha = 0.01
+
+# Find the critical z-scores for a two-tailed test
+z_critical_lower = norm.ppf(alpha / 2)   # Lower critical value
+z_critical_upper = norm.ppf(1 - alpha / 2)  
+
+# Fit a normal distribution to the data
+co2_mean = np.mean(data['offset_co2'])
+co2_std = np.std(data['offset_co2'])
+co2_max = np.max(data['offset_co2'])
+
+print(data['offset_co2'])
+
+
+# Calculate the extreme values
+extreme_lower = co2_mean + z_critical_lower * co2_std
+extreme_upper = co2_mean + z_critical_upper * co2_std
+
+print(f"Lower extreme value: {extreme_lower}")
+print(f"Upper extreme value: {extreme_upper}")
+
+print(co2_mean, co2_std, co2_max)

@@ -62,11 +62,11 @@ print(q_averages)
 
 fig, ax1 = plt.subplots(figsize=(10, 6))
 ax1.plot(threshold_values, q_averages, 'b-')
-ax1.set_xlabel('Line source length (m)')
+ax1.set_xlabel('Denominator restriction')
 ax1.set_ylabel('Total emission from \n line source (g/s)')
 ax1.set_xscale('log')  # Set the x-axis to a logarithmic scale
 ax1.set_yscale('log')  # Set the y-axis to a logarithmic scale
-#plt.savefig('sensitivity_experiment_3.png')
+plt.savefig('sensitivity_experiment_3.png')
 
 plt.show()
 
